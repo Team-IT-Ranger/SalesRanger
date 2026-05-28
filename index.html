@@ -23,8 +23,13 @@
 
 <!-- LOADING -->
 <div id="loading" class="fixed inset-0 bg-white flex flex-col items-center justify-center z-50 px-8 text-center">
-  <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+  <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" id="loadSpinner"></div>
   <p id="loadTxt" class="text-slate-500 text-sm">กำลังเริ่มระบบ...</p>
+  <div id="userIdCard" class="hidden mt-5 w-full max-w-xs bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left shadow">
+    <p class="text-xs text-slate-400 mb-1 font-semibold uppercase tracking-wide">LINE User ID</p>
+    <p id="userIdTxt" class="font-mono text-sm font-bold text-blue-700 break-all"></p>
+    <button onclick="copyUserId()" class="mt-3 w-full bg-blue-500 active:bg-blue-700 text-white text-xs font-bold py-2 rounded-xl">📋 Copy ID</button>
+  </div>
 </div>
 
 <!-- APP -->
@@ -284,7 +289,17 @@ async function main(){
     userId=userProfile.userId;
     $("hName").innerText=userProfile.displayName;
     if(userProfile.pictureUrl)$("hAvatar").src=userProfile.pictureUrl;
-    setLoad("ตรวจสอบสิทธิ์...");
+
+    // แสดง User ID ให้ตรวจสอบก่อนเข้าระบบ
+    $("userIdTxt").innerText=userId;
+    $("userIdCard").classList.remove("hidden");
+    $("loadSpinner").classList.add("hidden");
+    setLoad("เข้าสู่ระบบแล้ว — ตรวจสอบ ID แล้วรอสักครู่...");
+    await new Promise(r=>setTimeout(r,2500));
+    $("userIdCard").classList.add("hidden");
+    $("loadSpinner").classList.remove("hidden");
+    setLoad("กำลังตรวจสอบสิทธิ์...");
+
     const me=await api("getProfile");
     if(!me.success||!me.registered){setLoad(me.message||"ไม่พบสิทธิ์ กรุณาติดต่อแอดมิน");return;}
     role=me.role;
@@ -625,6 +640,15 @@ async function loadDashboard(){
         </div>`).join("")
       :'<p class="text-slate-400">ยังไม่มีบิล</p>';
   }
+}
+
+function copyUserId(){
+  navigator.clipboard.writeText(userId).then(()=>toast("✅ Copy แล้ว!","bg-green-600")).catch(()=>{
+    // fallback สำหรับ LINE browser ที่ clipboard อาจไม่ทำงาน
+    const ta=document.createElement("textarea");
+    ta.value=userId; document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+    document.body.removeChild(ta); toast("✅ Copy แล้ว!","bg-green-600");
+  });
 }
 
 main();
