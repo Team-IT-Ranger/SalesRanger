@@ -383,22 +383,36 @@ async function refreshAll(forceSync=false){
     updateSyncBadge();
     return;
   }
-  // ไม่มี cache หรือ force sync → ดึงจาก API
+
+  // ไม่มี cache → ดึง API พร้อม timeout 30 วินาที
+  setLoad("🔄 กำลังดึงข้อมูลสินค้าและลูกค้า...");
   toast("🔄 กำลัง Sync ข้อมูล...","bg-blue-500");
-  const r = await api("getBootstrap");
-  if(!r.success){ toast("❌ Sync ไม่ได้: "+r.message,"bg-red-500"); return; }
-  saveCache(r);
-  products  = r.item     || [];
-  customers = r.customer || [];
-  rules     = r.rules    || [];
-  renderProducts();
-  renderRestockList();
-  renderCountList();
-  renderCustomerDropdowns();
-  renderCustomerList();
-  updateSyncBadge();
-  toast("✅ Sync สำเร็จ","bg-green-600");
+
+  const timeout = new Promise((_,rej) => setTimeout(()=>rej(new Error('timeout')), 30000));
+
+  try{
+    const r = await Promise.race([api("getBootstrap"), timeout]);
+    if(!r.success){ toast("❌ "+r.message,"bg-red-500"); return; }
+    saveCache(r);
+    products  = r.item     || [];
+    customers = r.customer || [];
+    rules     = r.rules    || [];
+    renderProducts();
+    renderRestockList();
+    renderCountList();
+    renderCustomerDropdowns();
+    renderCustomerList();
+    updateSyncBadge();
+    toast("✅ Sync สำเร็จ","bg-green-600");
+  } catch(e){
+    if(e.message==='timeout'){
+      toast("⏱️ หมดเวลา — ลองกด Sync ใหม่อีกครั้ง","bg-orange-500");
+    } else {
+      toast("❌ "+e.message,"bg-red-500");
+    }
+  }
 }
+
 
 function updateSyncBadge(){
   const q = loadQueue();
