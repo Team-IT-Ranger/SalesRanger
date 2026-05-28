@@ -295,7 +295,7 @@ async function main(){
     $("userIdTxt").innerText=userId;
     $("userIdCard").classList.remove("hidden");
     $("loadSpinner").classList.add("hidden");
-    setLoad("เข้าสู่ระบบแล้ว—นี่คือ LUID ของคุณ...");
+    setLoad("เข้าสู่ระบบแล้ว—นี่คือ Line User ID ของคุณ...");
     await Promise.race([waitForContinue(), new Promise(r=>setTimeout(r,50000))]);
     $("userIdCard").classList.add("hidden");
     $("loadSpinner").classList.remove("hidden");
@@ -316,8 +316,8 @@ async function main(){
 async function refreshAll(){
   const r=await api("getBootstrap");
   if(!r.success){toast("โหลดข้อมูลไม่ได้: "+r.message,"bg-red-500");return;}
-  products=r.products||[];
-  customers=r.customers||[];
+  products=r.item||[];
+  customers=r.customer||[];
   rules=r.rules||[];
   renderProducts();
   renderRestockList();
@@ -387,16 +387,16 @@ function renderProducts(){
         <p class="text-xs text-slate-400">${baht(p.price)} ฿/${p.unit} · รถ <span id="vs-${p.id}" class="font-bold ${p.vanStock<3?'text-red-500':'text-green-600'}">${p.vanStock}</span></p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button onclick="changeCart(${p.id},-1)" class="w-9 h-9 rounded-xl bg-slate-100 active:bg-slate-200 font-bold text-lg flex items-center justify-center">−</button>
+        <button onclick="changeCart('${p.id}',-1)" class="w-9 h-9 rounded-xl bg-slate-100 active:bg-slate-200 font-bold text-lg flex items-center justify-center">−</button>
         <span class="w-7 text-center font-bold text-sm" id="cq-${p.id}">${inCart||''}</span>
-        <button onclick="changeCart(${p.id},1)" class="w-9 h-9 rounded-xl bg-blue-500 active:bg-blue-700 text-white font-bold text-lg flex items-center justify-center">＋</button>
+        <button onclick="changeCart('${p.id}',1)" class="w-9 h-9 rounded-xl bg-blue-500 active:bg-blue-700 text-white font-bold text-lg flex items-center justify-center">＋</button>
       </div>
     </div>`;
   }).join("");
 }
 
 function changeCart(id,delta){
-  const p=products.find(x=>x.id===id);
+  const p=products.find(x=>x.id==id);
   const cur=cart[id]?.qty||0;
   let next=Math.max(0,cur+delta);
   if(next>p.vanStock){toast("สต็อกบนรถมีแค่ "+p.vanStock+" "+p.unit,"bg-orange-500");next=p.vanStock;}
@@ -492,7 +492,7 @@ function renderRestockList(){
         <p class="text-xs text-slate-400">คลัง <b>${p.warehouse}</b> · รถ <b class="${p.vanStock<3?'text-red-500':'text-green-600'}">${p.vanStock}</b></p>
       </div>
       <input type="number" min="0" inputmode="numeric" placeholder="0"
-        value="${restockQty[p.id]||''}" onchange="setRestock(${p.id},this.value)"
+        value="${restockQty[p.id]||''}" onchange="setRestock('${p.id}',this.value)"
         class="w-16 p-2 rounded-xl border text-center text-sm"/>
     </div>`).join("");
 }
@@ -519,7 +519,7 @@ function renderCountList(){
         <p class="text-xs text-slate-400">ในระบบ: <b>${p.vanStock}</b></p>
       </div>
       <input type="number" min="0" inputmode="numeric" placeholder="นับได้"
-        value="${countQty[p.id]??''}" onchange="setCount(${p.id},this.value)"
+        value="${countQty[p.id]??''}" onchange="setCount('${p.id}',this.value)"
         class="w-20 p-2 rounded-xl border text-center text-sm"/>
     </div>`).join("");
 }
@@ -643,9 +643,12 @@ async function loadDashboard(){
   }
 }
 
+
+// รอผู้ใช้กดปุ่ม "ดำเนินการต่อ" — resolve เมื่อกด
 let _continueResolve=null;
 function waitForContinue(){return new Promise(r=>{_continueResolve=r;});}
-function continueInit(){if(_continueResolve){_continueResolve();_continueResolve=null;}}  
+function continueInit(){if(_continueResolve){_continueResolve();_continueResolve=null;}}
+
 
 function copyUserId(){
   navigator.clipboard.writeText(userId).then(()=>toast("✅ Copy แล้ว!","bg-green-600")).catch(()=>{
