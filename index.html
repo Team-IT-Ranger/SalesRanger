@@ -4,7 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <title>Van Sales</title>
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<!--script src="https://static.line-scdn.net/liff/edge/2/sdk.js" ></script-->
+<script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js" async></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{-webkit-tap-highlight-color:transparent;font-family:'Sarabun',sans-serif}
@@ -324,6 +325,13 @@ async function api(action,payload={}){
 async function main(){
   try{
     setLoad("เชื่อมต่อ LINE...");
+
+    // รอ LIFF SDK โหลดเสร็จก่อน (กรณี async)
+    await new Promise(r => {
+      if(typeof liff !== 'undefined') return r();
+      const t = setInterval(()=>{ if(typeof liff !== 'undefined'){ clearInterval(t); r(); } }, 100);
+    });
+
     await liff.init({liffId:LIFF_ID});
     if(!liff.isLoggedIn()){liff.login();return;}
     setLoad("ดึงข้อมูลผู้ใช้...");
