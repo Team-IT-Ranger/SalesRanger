@@ -29,6 +29,7 @@
     <p class="text-xs text-slate-400 mb-1 font-semibold uppercase tracking-wide">LINE User ID</p>
     <p id="userIdTxt" class="font-mono text-sm font-bold text-blue-700 break-all"></p>
     <button onclick="copyUserId()" class="mt-3 w-full bg-blue-500 active:bg-blue-700 text-white text-xs font-bold py-2 rounded-xl">📋 Copy ID</button>
+    <button onclick="continueInit()" class="mt-2 w-full bg-green-500 active:bg-green-700 text-white text-xs font-bold py-2 rounded-xl">▶ ดำเนินการต่อ</button>    
   </div>
 </div>
 
@@ -295,7 +296,7 @@ async function main(){
     $("userIdCard").classList.remove("hidden");
     $("loadSpinner").classList.add("hidden");
     setLoad("เข้าสู่ระบบแล้ว — ตรวจสอบ ID แล้วรอสักครู่...");
-    await new Promise(r=>setTimeout(r,2500));
+    await new Promise(r=>setTimeout(r,50000));
     $("userIdCard").classList.add("hidden");
     $("loadSpinner").classList.remove("hidden");
     setLoad("กำลังตรวจสอบสิทธิ์...");
