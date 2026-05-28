@@ -37,6 +37,7 @@
 <div id="app" class="hidden">
 
   <!-- HEADER -->
+  <!-- old code
   <header class="bg-blue-600 text-white px-4 py-3 sticky top-0 z-30 shadow-md">
     <div class="flex items-center gap-3">
       <img id="hAvatar" class="w-10 h-10 rounded-full bg-blue-400 object-cover border-2 border-white/40"/>
@@ -46,7 +47,20 @@
       </div>
       <span id="hRole" class="badge bg-amber-400 text-blue-900">USER</span>
     </div>
+  </header> -->
+  <header class="bg-blue-600 text-white px-4 py-3 sticky top-0 z-30 shadow-md">
+    <div class="flex items-center gap-3">
+      <img id="hAvatar" class="w-10 h-10 rounded-full bg-blue-400 object-cover border-2 border-white/40"/>
+      <div class="flex-1 min-w-0">
+        <p id="hName" class="font-bold truncate leading-tight">Van Sales</p>
+        <p class="text-xs text-blue-100">หน่วย: <span id="hSchema">-</span> · <span id="lastSyncLbl">ยังไม่ได้ Sync</span></p>
+      </div>
+      <button onclick="syncNow()" id="syncBadge"
+        class="badge bg-amber-400 text-blue-900 cursor-pointer active:opacity-70">🔄 Sync</button>
+      <span id="hRole" class="badge bg-white/20 text-white">USER</span>
+    </div>
   </header>
+
 
   <!-- ═══════════════════════════════════════════ SELL ═══ -->
   <section id="screen-sell" class="screen active p-3 space-y-3 fade">
@@ -251,6 +265,33 @@ let restockQty={}, countQty={};
 let custGps={lat:"",lng:""};
 let activeVisitId=0, activeVisitCustName="";
 
+
+// ══════════════════════════════════════════════
+//  CACHE (localStorage)
+// ══════════════════════════════════════════════
+const CACHE_KEY   = 'vansales_bootstrap';
+const QUEUE_KEY   = 'vansales_queue';
+const CACHE_TTL   = 24 * 60 * 60 * 1000; // 24 ชั่วโมง
+
+function saveCache(data){
+  localStorage.setItem(CACHE_KEY, JSON.stringify({
+    ts: Date.now(), data
+  }));
+}
+function loadCache(){
+  try{
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(Date.now() - obj.ts > CACHE_TTL) return null; // หมดอายุ
+    return obj.data;
+  }catch(e){ return null; }
+}
+function saveQueue(q){ localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
+function loadQueue(){ try{ return JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }catch(e){ return []; } }
+
+
+
 // ══════════════════════════════════════════════
 //  UTILS
 // ══════════════════════════════════════════════
@@ -313,6 +354,8 @@ async function main(){
   }catch(e){setLoad("ผิดพลาด: "+e.message);}
 }
 
+
+/*
 async function refreshAll(){
   const r=await api("getBootstrap");
   if(!r.success){toast("โหลดข้อมูลไม่ได้: "+r.message,"bg-red-500");return;}
@@ -325,6 +368,57 @@ async function refreshAll(){
   renderCustomerDropdowns();
   renderCustomerList();
 }
+*/
+async function refreshAll(forceSync=false){
+  const cached = forceSync ? null : loadCache();
+  if(cached){
+    products  = cached.item     || [];
+    customers = cached.customer || [];
+    rules     = cached.rules    || [];
+    renderProducts();
+    renderRestockList();
+    renderCountList();
+    renderCustomerDropdowns();
+    renderCustomerList();
+    updateSyncBadge();
+    return;
+  }
+  // ไม่มี cache หรือ force sync → ดึงจาก API
+  toast("🔄 กำลัง Sync ข้อมูล...","bg-blue-500");
+  const r = await api("getBootstrap");
+  if(!r.success){ toast("❌ Sync ไม่ได้: "+r.message,"bg-red-500"); return; }
+  saveCache(r);
+  products  = r.item     || [];
+  customers = r.customer || [];
+  rules     = r.rules    || [];
+  renderProducts();
+  renderRestockList();
+  renderCountList();
+  renderCustomerDropdowns();
+  renderCustomerList();
+  updateSyncBadge();
+  toast("✅ Sync สำเร็จ","bg-green-600");
+}
+
+function updateSyncBadge(){
+  const q = loadQueue();
+  const badge = $("syncBadge");
+  if(badge) badge.innerText = q.length ? `🔄 Sync (${q.length})` : '🔄 Sync';
+  const raw = localStorage.getItem(CACHE_KEY);
+  const lbl = $("lastSyncLbl");
+  if(lbl && raw){
+    const ts = JSON.parse(raw).ts;
+    lbl.innerText = 'Sync ล่าสุด: ' + new Date(ts).toLocaleTimeString('th-TH');
+  }
+}
+
+async function syncNow(){
+  // 1) push queue ที่ค้างอยู่ก่อน
+  await flushQueue();
+  // 2) ดึงข้อมูลใหม่
+  await refreshAll(true);
+}
+
 
 // ══════════════════════════════════════════════
 //  TAB
@@ -449,6 +543,8 @@ function toggleCartDetail(){
   $("cartDetail").classList.toggle("hidden");
 }
 
+
+/*
 async function submitSale(){
   const ids=Object.keys(cart);
   if(!ids.length)return toast("ยังไม่มีสินค้าในตะกร้า","bg-orange-500");
@@ -473,6 +569,59 @@ async function submitSale(){
     renderCart();
   }else toast("❌ "+r.message,"bg-red-500");
 }
+*/
+async function submitSale(){
+  const ids = Object.keys(cart);
+  if(!ids.length) return toast("ยังไม่มีสินค้าในตะกร้า","bg-orange-500");
+  const btn = $("checkoutBtn"); btn.disabled=true; btn.innerText="⏳ กำลังบันทึก...";
+  const gps   = await getGPS();
+  const calc  = runDiscounts();
+  const sale  = {
+    customerId:   parseInt($("sellCust").value)||0,
+    visitId:      activeVisitId,
+    items:        Object.values(cart).map(c=>({productId:c.id,qty:c.qty,price:c.price})),
+    freeGoods:    freeGoods.filter(f=>f.applied),
+    appliedRules,
+    discountTotal: calc.billDiscount,
+    paymentType:  $("payType").value,
+    latitude:     gps.lat, longitude: gps.lng, googleMap: gps.map,
+    _savedAt:     new Date().toISOString()
+  };
+
+  if(!navigator.onLine){
+    // offline → เก็บใน queue
+    const q = loadQueue(); q.push(sale); saveQueue(q);
+    toast(`📦 บันทึก offline (${q.length} บิลรอ Sync)`,"bg-orange-500");
+    cart={}; freeGoods=[]; appliedRules=[];
+    renderProducts(); renderCart(); updateSyncBadge();
+    btn.disabled=false; btn.innerText="✅ บันทึกการขาย";
+    return;
+  }
+
+  // online → ส่งทันที
+  const r = await api("recordSale", sale);
+  btn.disabled=false; btn.innerText="✅ บันทึกการขาย";
+  if(r.success){
+    toast(`✅ บิล ${r.orderCode} · ${baht(r.total)} ฿`,"bg-green-600");
+    cart={}; freeGoods=[]; appliedRules=[];
+    renderProducts(); renderCart(); updateSyncBadge();
+  }else toast("❌ "+r.message,"bg-red-500");
+}
+
+async function flushQueue(){
+  const q = loadQueue();
+  if(!q.length) return;
+  if(!navigator.onLine){ toast("❌ ไม่มีสัญญาณ ยังไม่สามารถ Sync ได้","bg-red-500"); return; }
+  let ok=0, fail=0;
+  for(const sale of q){
+    const r = await api("recordSale", sale);
+    if(r.success) ok++; else fail++;
+  }
+  if(fail===0){ saveQueue([]); toast(`✅ Sync ${ok} บิลสำเร็จ`,"bg-green-600"); }
+  else toast(`⚠️ Sync ${ok} สำเร็จ ${fail} ล้มเหลว`,"bg-orange-500");
+  updateSyncBadge();
+}
+
 
 // ══════════════════════════════════════════════
 //  STOCK
