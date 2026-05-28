@@ -63,7 +63,7 @@
   </header>
 
 
-  <!-- ═══════════════════════════════════════════ SELL ═══ -->
+  <!-- ══════════════════════════ SELL ═══════════════════════════ -->
   <section id="screen-sell" class="screen active p-3 space-y-3 fade">
     <div class="flex items-center justify-between">
       <h2 class="font-bold text-slate-700">🛒 ทำรายการขาย</h2>
@@ -393,13 +393,16 @@ async function refreshAll(forceSync=false){
   }
 
   // ไม่มี cache → ดึง API พร้อม timeout 30 วินาที
-  setLoad("🔄 กำลังดึงข้อมูลสินค้าและลูกค้า...");
+  setLoad("🔄 กำลังอ่านข้อมูลระบบ...");
   toast("🔄 กำลัง Sync ข้อมูล...","bg-blue-500");
+  const dots = setInterval(()=>{
+  const t = $("loadTxt").innerText;
+  $("loadTxt").innerText = t.endsWith("...") ? t.slice(0,-3) : t+".";}, 800);
 
-  const timeout = new Promise((_,rej) => setTimeout(()=>rej(new Error('timeout')), 30000));
-
+  const timeout = new Promise((_,rej) => setTimeout(()=>rej(new Error('timeout')), 60000));
   try{
     const r = await Promise.race([api("getBootstrap"), timeout]);
+    clearInterval(dots);
     if(!r.success){ toast("❌ "+r.message,"bg-red-500"); return; }
     saveCache(r);
     products  = r.item     || [];
@@ -413,11 +416,32 @@ async function refreshAll(forceSync=false){
     updateSyncBadge();
     toast("✅ Sync สำเร็จ","bg-green-600");
   } catch(e){
-    if(e.message==='timeout'){
-      toast("⏱️ หมดเวลา — ลองกด Sync ใหม่อีกครั้ง","bg-orange-500");
-    } else {
-      toast("❌ "+e.message,"bg-red-500");
-    }
+      clearInterval(dots);
+
+      try{
+        const raw = localStorage.getItem(CACHE_KEY);
+        if(raw){
+          const obj = JSON.parse(raw);
+          products  = obj.data.item     || [];
+          customers = obj.data.customer || [];
+          rules     = obj.data.rules    || [];
+          renderProducts();
+          renderRestockList();
+          renderCountList();
+          renderCustomerDropdowns();
+          renderCustomerList();
+          updateSyncBadge();
+          toast("⚠️ ใช้ข้อมูลเก่า — กด Sync เมื่อพร้อม","bg-orange-500");
+          return;
+        }
+      }catch(_){}
+      toast("❌ หมดเวลา ไม่มี cache — ตรวจสอบสัญญาณแล้วกด Sync","bg-red-500");
+      
+      if(e.message==='timeout'){
+        toast("⏱️ หมดเวลา — ลองกด Sync ใหม่อีกครั้ง","bg-orange-500");
+      } else {
+        toast("❌ "+e.message,"bg-red-500");
+      }
   }
 }
 
