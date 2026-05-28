@@ -295,8 +295,8 @@ async function main(){
     $("userIdTxt").innerText=userId;
     $("userIdCard").classList.remove("hidden");
     $("loadSpinner").classList.add("hidden");
-    setLoad("เข้าสู่ระบบแล้ว — ตรวจสอบ ID แล้วรอสักครู่...");
-    await new Promise(r=>setTimeout(r,50000));
+    setLoad("เข้าสู่ระบบแล้ว—นี่คือ LUID ของคุณ...");
+    await Promise.race([waitForContinue(), new Promise(r=>setTimeout(r,50000))]);
     $("userIdCard").classList.add("hidden");
     $("loadSpinner").classList.remove("hidden");
     setLoad("กำลังตรวจสอบสิทธิ์...");
@@ -642,6 +642,10 @@ async function loadDashboard(){
       :'<p class="text-slate-400">ยังไม่มีบิล</p>';
   }
 }
+
+let _continueResolve=null;
+function waitForContinue(){return new Promise(r=>{_continueResolve=r;});}
+function continueInit(){if(_continueResolve){_continueResolve();_continueResolve=null;}}  
 
 function copyUserId(){
   navigator.clipboard.writeText(userId).then(()=>toast("✅ Copy แล้ว!","bg-green-600")).catch(()=>{
